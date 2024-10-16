@@ -1,24 +1,51 @@
 import requests
 from PIL import Image
 from io import BytesIO
+import pandas as pd
+import os
 
-url = 'https://vtrina.sfo2.digitaloceanspaces.com/HUB_62cc31771c009c00017acaf3/01VISUPCDC_20240422110512810887.jpg'
+# Função para extrair o código do produto da URL
+def extrair_codigo_produto(url):
+    parte_codigo = url.split('/')[-1]
+    codigo_produto = parte_codigo.split('_')[0]
+    return codigo_produto
 
-def extrairCodigoProduto(url):
-  parteCodigo = url.split('/')[-1]
-  codigoProduto = parteCodigo.split('_')[0]
-  return codigoProduto
+# Função para salvar a imagem com sequenciamento no nome
+def salvar_imagem_com_sequencia(codigo_produto, img):
+    # Verifica se o arquivo já existe
+    contador = 1
+    nome_arquivo = f'{codigo_produto}.jpg'
+    
+    while os.path.exists(nome_arquivo):
+        contador += 1
+        nome_arquivo = f'{codigo_produto}-{contador}.jpg'
+    
+    img.save(nome_arquivo)
+    print(f"Imagem salva como: {nome_arquivo}")
 
-response = requests.get(url)
+# Lê a planilha Excel
+planilha = pd.read_excel('exp-produtos.xlsx')
+print(planilha.columns)
 
-if response.status_code == 200:
-  img = Image.open(BytesIO(response.content))
-  novaLargura, novaAltura = 1005, 1005
-  imgRedimensionada = img.resize((novaLargura, novaAltura))
+# Supondo que a coluna com as URLs esteja nomeada como 'url'
+for url in planilha['url']:
+    # Baixa o conteúdo da imagem
+    response = requests.get(url)
 
-  codigoProduto = extrairCodigoProduto(url)
+    # Verifica se a requisição foi bem-sucedida
+    if response.status_code == 200:
+        # Abre a imagem em um objeto Image
+        img = Image.open(BytesIO(response.content))
 
-  imgRedimensionada.save(f'{codigoProduto}.jpg') # verificar nome da imagem salva
-  print('Imagem redimensionada com sucesso!')
-else:
-  print('Falha ao redimensionar a imagem. Código de status: {response.status_code}}')
+        # Define as novas dimensões (ex: 300x300)
+        nova_largura, nova_altura = 300, 300
+        img_redimensionada = img.resize((nova_largura, nova_altura))
+
+        # Extrai o código do produto
+        codigo_produto = extrair_codigo_produto(url)
+
+        # Salva a imagem com o nome do código e sequência se necessário
+        salvar_imagem_com_sequencia(codigo_produto, img_redimensionada)
+        print(f"Imagem baixada e redimensionada com sucesso!")
+    else:
+        print(f"Falha ao baixar a imagem. Código de status: {response.status_code}")
